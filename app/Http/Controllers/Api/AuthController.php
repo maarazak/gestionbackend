@@ -33,8 +33,9 @@ class AuthController extends BaseController
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => 'admin'
         ]);
+
+        $user->assignRole('admin');
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
