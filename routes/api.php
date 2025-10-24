@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\UserController;
 
 // Auth routes (publiques)
 Route::post('/register', [AuthController::class, 'register']);
@@ -13,10 +14,19 @@ Route::post('/login', [AuthController::class, 'login']);
 
 // Routes protégées
 Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
+    // Auth
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
     
+    // Users 
+    Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users/invite', [UserController::class, 'invite']);
+    Route::delete('/users/{user}', [UserController::class, 'destroy']);
+    
+    // Projects
     Route::apiResource('projects', ProjectController::class);
+    
+    // Tasks
     Route::apiResource('tasks', TaskController::class);
 });
 

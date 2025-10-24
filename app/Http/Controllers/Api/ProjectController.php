@@ -8,32 +8,91 @@ use Illuminate\Http\Request;
 
 class ProjectController extends BaseController
 {
-    public function index()
+    /**
+     * Liste des projets
+     */
+    public function index(Request $request)
     {
-        $projects = Project::with('tasks')->get();
+        $user = $request->user();
+
+        if ($user->hasRole('admin')) {
+           
+            $projects = Project::with(['tasks' => function($query) {
+                $query->with('assignedUser:id,name,email');
+            }])->get();
+        } else {
+           
+            $projects = Project::whereHas('tasks', function($query) use ($user) {
+                $query->where('assigned_to', $user->id);
+            })->with(['tasks' => function($query) use ($user) {
+                $query->where('assigned_to', $user->id)
+                      ->with('assignedUser:id,name,email');
+            }])->get();
+        }
+
         return $this->success($projects, 'Projets récupérés');
     }
 
+    /**
+     * Créer un projet 
+     */
     public function store(Request $request)
     {
+        if (!$request->user()->hasRole('admin')) {
+            return $this->unauthorized('Seuls les administrateurs peuvent créer des projets');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'in:active,completed,archived'
+            'status' => 'nullable|in:active,completed,archived'
         ]);
 
+        $validated['status'] = $validated['status'] ?? 'active';
+
         $project = Project::create($validated);
-        return $this->created($project, 'Projet créé avec succès');
+        
+        return $this->created($project->load('tasks'), 'Projet créé avec succès');
     }
 
-    public function show(Project $project)
+    /**
+     * Afficher un projet
+     */
+    public function show(Request $request, Project $project)
     {
-        // Le middleware vérifie déjà le tenant
-        return $this->success($project->load('tasks.assignedUser'), 'Projet récupéré');
+        $user = $request->user();
+
+        if (!$user->hasRole('admin')) {
+           
+            $hasTask = $project->tasks()->where('assigned_to', $user->id)->exists();
+            
+            if (!$hasTask) {
+                return $this->unauthorized('Vous n\'avez pas accès à ce projet');
+            }
+
+           
+            $project->load(['tasks' => function($query) use ($user) {
+                $query->where('assigned_to', $user->id)
+                      ->with('assignedUser:id,name,email');
+            }]);
+        } else {
+            $project->load(['tasks' => function($query) {
+                $query->with('assignedUser:id,name,email');
+            }]);
+        }
+
+        return $this->success($project, 'Projet récupéré');
     }
 
+    /**
+     * Mettre à jour un projet 
+     */
     public function update(Request $request, Project $project)
     {
+        if (!$request->user()->hasRole('admin')) {
+            return $this->unauthorized('Seuls les administrateurs peuvent modifier des projets');
+        }
+
         $validated = $request->validate([
             'name' => 'string|max:255',
             'description' => 'nullable|string',
@@ -41,12 +100,21 @@ class ProjectController extends BaseController
         ]);
 
         $project->update($validated);
+        
         return $this->success($project, 'Projet mis à jour');
     }
 
-    public function destroy(Project $project)
+    /**
+     * Supprimer un projet 
+     */
+    public function destroy(Request $request, Project $project)
     {
+        if (!$request->user()->hasRole('admin')) {
+            return $this->unauthorized('Seuls les administrateurs peuvent supprimer des projets');
+        }
+
         $project->delete();
-        return $this->noContent('Projet supprimé');
+        
+        return $this->success(null, 'Projet supprimé');
     }
 }
