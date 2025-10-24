@@ -12,7 +12,7 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 // Routes protégées
-Route::middleware(['auth:sanctum', TenantScope::class])->group(function () {
+Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
     

@@ -1,61 +1,319 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🏢 Backend Application de Gestion Multi-Tenant
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API REST complète pour la gestion de projets et tâches avec architecture multi-tenant. Chaque organisation dispose de son propre espace isolé et sécurisé.
 
-## About Laravel
+## 🚀 Fonctionnalités
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### Architecture Multi-Tenant
+- **Isolation des données** : Chaque tenant (organisation) a ses propres données
+- **Sécurité renforcée** : Middleware automatique pour filtrer les données par tenant
+- **Scalabilité** : Support de multiples organisations sur une seule instance
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Gestion des Entités
+- **Tenants** : Organisations avec paramètres personnalisables
+- **Users** : Utilisateurs avec rôles (admin/member) par tenant
+- **Projects** : Projets avec statuts (active/completed/archived)
+- **Tasks** : Tâches avec priorités, assignations et échéances
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### API REST Complète
+- **Authentification** : Inscription, connexion, déconnexion
+- **CRUD complet** : Création, lecture, mise à jour, suppression
+- **Relations** : Gestion des liens entre entités
+- **Validation** : Contrôles de données robustes
 
-## Learning Laravel
+## 🏗️ Architecture Technique
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Stack Technologique
+- **Laravel 11** : Framework PHP moderne
+- **MySQL** : Base de données relationnelle
+- **Laravel Sanctum** : Authentification API
+- **UUID** : Identifiants uniques pour toutes les entités
+- **CORS** : Support des requêtes cross-origin
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+### Structure des Modèles
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```
+Tenant (Organisation)
+├── Users (Utilisateurs)
+├── Projects (Projets)
+└── Tasks (Tâches)
+    ├── Project (Projet parent)
+    └── AssignedUser (Utilisateur assigné)
+```
 
-## Laravel Sponsors
+### Base de Données
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+#### Table `tenants`
+- `id` (UUID, Primary Key)
+- `name` (Nom de l'organisation)
+- `slug` (Identifiant unique)
+- `domain` (Domaine personnalisé, optionnel)
+- `settings` (Configuration JSON, optionnel)
 
-### Premium Partners
+#### Table `users`
+- `id` (UUID, Primary Key)
+- `tenant_id` (Foreign Key vers tenants)
+- `name`, `email`, `password`
+- `role` (admin/member)
+- Contrainte unique : `[tenant_id, email]`
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+#### Table `projects`
+- `id` (UUID, Primary Key)
+- `tenant_id` (Foreign Key vers tenants)
+- `name`, `description`
+- `status` (active/completed/archived)
+- Index sur `tenant_id`
 
-## Contributing
+#### Table `tasks`
+- `id` (UUID, Primary Key)
+- `tenant_id` (Foreign Key vers tenants)
+- `project_id` (Foreign Key vers projects)
+- `assigned_to` (Foreign Key vers users, optionnel)
+- `title`, `description`
+- `status` (todo/in_progress/done)
+- `priority` (low/medium/high)
+- `due_date` (Date d'échéance, optionnel)
+- Index composite sur `[tenant_id, project_id]`
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## 🔧 Installation
 
-## Code of Conduct
+### Prérequis
+- PHP 8.2+
+- Composer
+- MySQL 8.0+
+- Node.js (pour les assets)
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Installation
+```bash
+# Cloner le projet
+git clone <repository-url>
+cd gestion-api
 
-## Security Vulnerabilities
+# Installer les dépendances
+composer install
+npm install
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# Configuration
+cp .env.example .env
+php artisan key:generate
 
-## License
+# Base de données
+php artisan migrate
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Démarrer le serveur
+php artisan serve
+```
+
+## 📡 API Endpoints
+
+### Authentification
+```
+POST /api/register          # Inscription (création tenant + admin)
+POST /api/login             # Connexion
+GET  /api/me               # Profil utilisateur
+POST /api/logout           # Déconnexion
+```
+
+### Gestion des Projets
+```
+GET    /api/projects       # Liste des projets
+POST   /api/projects       # Créer un projet
+GET    /api/projects/{id}  # Détail d'un projet
+PUT    /api/projects/{id}  # Modifier un projet
+DELETE /api/projects/{id}  # Supprimer un projet
+```
+
+### Gestion des Tâches
+```
+GET    /api/tasks          # Liste des tâches
+POST   /api/tasks          # Créer une tâche
+GET    /api/tasks/{id}     # Détail d'une tâche
+PUT    /api/tasks/{id}     # Modifier une tâche
+DELETE /api/tasks/{id}     # Supprimer une tâche
+```
+
+### Gestion des Tenants (Admin)
+```
+GET    /api/tenants                    # Liste des tenants
+POST   /api/tenants                    # Créer un tenant
+GET    /api/tenants/{id}               # Détail d'un tenant
+PUT    /api/tenants/{id}               # Modifier un tenant
+DELETE /api/tenants/{id}               # Supprimer un tenant
+POST   /api/tenants/{id}/users         # Ajouter un utilisateur
+GET    /api/tenants/{id}/users         # Utilisateurs du tenant
+GET    /api/tenants/{id}/projects      # Projets du tenant
+GET    /api/tenants/{id}/tasks         # Tâches du tenant
+```
+
+## 🔒 Sécurité
+
+### Middleware TenantScope
+- **Isolation automatique** : Filtre les données par tenant
+- **Injection de contexte** : Ajoute `tenant_id` aux requêtes
+- **Scope global** : Applique automatiquement les contraintes
+
+### Authentification
+- **Laravel Sanctum** : Tokens d'authentification
+- **CORS configuré** : Support des requêtes frontend
+- **Validation robuste** : Contrôles de données stricts
+
+### Isolation des Données
+- **Contraintes de clés étrangères** : Intégrité référentielle
+- **Index optimisés** : Performance des requêtes
+- **Cascade delete** : Suppression en cascade sécurisée
+
+## 🎯 Utilisation
+
+### Inscription d'une Organisation
+```json
+POST /api/register
+{
+  "tenant_name": "Mon Entreprise",
+  "tenant_slug": "mon-entreprise",
+  "name": "Admin User",
+  "email": "admin@mon-entreprise.com",
+  "password": "motdepasse123"
+}
+```
+
+### Connexion
+```json
+POST /api/login
+{
+  "email": "admin@mon-entreprise.com",
+  "password": "motdepasse123",
+  "tenant_slug": "mon-entreprise"
+}
+```
+
+### Création d'un Projet
+```json
+POST /api/projects
+Authorization: Bearer {token}
+{
+  "name": "Nouveau Projet",
+  "description": "Description du projet",
+  "status": "active"
+}
+```
+
+### Création d'une Tâche
+```json
+POST /api/tasks
+Authorization: Bearer {token}
+{
+  "project_id": "uuid-du-projet",
+  "title": "Nouvelle Tâche",
+  "description": "Description de la tâche",
+  "priority": "high",
+  "due_date": "2024-12-31"
+}
+```
+
+## 🏛️ Architecture des Controllers
+
+### BaseController
+- **Réponses standardisées** : Format JSON cohérent
+- **Codes de statut** : Gestion appropriée des erreurs
+- **Messages** : Retours utilisateur clairs
+
+### Controllers Spécialisés
+- **AuthController** : Authentification et gestion des sessions
+- **ProjectController** : CRUD des projets
+- **TaskController** : CRUD des tâches
+- **TenantController** : Gestion des organisations
+
+## 🔄 Réponses API
+
+### Format Standard
+```json
+{
+  "success": true,
+  "message": "Opération réussie",
+  "data": { ... }
+}
+```
+
+### Codes de Statut
+- `200` : Succès
+- `201` : Création réussie
+- `204` : Suppression réussie
+- `400` : Erreur de requête
+- `401` : Non authentifié
+- `404` : Ressource non trouvée
+- `422` : Erreur de validation
+
+## 🚀 Déploiement
+
+### Variables d'Environnement
+```env
+APP_NAME="Gestion API Multi-Tenant"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://votre-domaine.com
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=gestion_api
+DB_USERNAME=username
+DB_PASSWORD=password
+
+SANCTUM_STATEFUL_DOMAINS=localhost:3000
+```
+
+### Optimisations Production
+```bash
+# Cache des configurations
+php artisan config:cache
+
+# Cache des routes
+php artisan route:cache
+
+# Cache des vues
+php artisan view:cache
+
+# Optimisation Composer
+composer install --optimize-autoloader --no-dev
+```
+
+## 📊 Monitoring
+
+### Logs
+- **Laravel Log** : Journaux d'application
+- **Database Log** : Requêtes SQL
+- **Error Tracking** : Gestion des erreurs
+
+### Métriques
+- **Performance** : Temps de réponse API
+- **Utilisation** : Statistiques d'usage
+- **Sécurité** : Tentatives d'accès
+
+## 🤝 Contribution
+
+### Développement
+1. Fork du projet
+2. Création d'une branche feature
+3. Développement des fonctionnalités
+4. Tests et validation
+5. Pull Request
+
+### Standards
+- **PSR-12** : Standards de codage PHP
+- **Tests** : Couverture de tests
+- **Documentation** : Documentation à jour
+
+## 📄 Licence
+
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
+
+## 🆘 Support
+
+Pour toute question ou problème :
+- **Issues GitHub** : Signalement de bugs
+- **Documentation** : Guide d'utilisation
+- **Communauté** : Forum de discussion
+
+---
+
+**Développé avec ❤️ en Laravel 11**
