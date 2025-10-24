@@ -66,16 +66,6 @@ class ProjectController extends BaseController
             }]);
         } else {
            
-            $userTasksCount = \DB::table('tasks')
-                ->where('project_id', $project->id)
-                ->where('assigned_to', $user->id)
-                ->where('tenant_id', $user->tenant_id)
-                ->count();
-            
-            if ($userTasksCount === 0) {
-                return $this->forbidden('Vous n\'avez pas accès à ce projet car aucune tâche ne vous y est assignée');
-            }
-
             $project->load(['tasks' => function($query) use ($user) {
                 $query->where('assigned_to', $user->id)
                       ->with('assignedUser:id,name,email');
