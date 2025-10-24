@@ -13,19 +13,16 @@ class TaskController extends BaseController
 {
     /**
      * Liste des tâches
-    
      */
     public function index(Request $request)
     {
         $user = $request->user();
         $query = Task::with(['project', 'assignedUser']);
         
-       
         if ($request->project_id) {
             $query->where('project_id', $request->project_id);
         }
 
-      
         if (!$user->hasRole('admin')) {
             $query->where('assigned_to', $user->id);
         }
@@ -36,12 +33,12 @@ class TaskController extends BaseController
     }
 
     /**
-     * Créer une tâche 
+     * Créer une tâche (admin uniquement)
      */
     public function store(Request $request)
     {
         if (!$request->user()->hasRole('admin')) {
-            return $this->unauthorized('Seuls les administrateurs peuvent créer des tâches');
+            return $this->forbidden('Seuls les administrateurs peuvent créer des tâches');
         }
 
         try {
@@ -57,7 +54,7 @@ class TaskController extends BaseController
 
             $project = Project::findOrFail($validated['project_id']);
             if ($project->tenant_id !== $request->user()->tenant_id) {
-                return $this->unauthorized('Ce projet n\'existe pas dans votre organisation');
+                return $this->forbidden('Ce projet n\'existe pas dans votre organisation');
             }
 
             $assignedUser = User::findOrFail($validated['assigned_to']);
@@ -87,14 +84,13 @@ class TaskController extends BaseController
 
     /**
      * Afficher une tâche
-    
      */
     public function show(Request $request, Task $task)
     {
         $user = $request->user();
 
         if (!$user->hasRole('admin') && $task->assigned_to !== $user->id) {
-            return $this->unauthorized('Vous n\'avez pas accès à cette tâche');
+            return $this->forbidden('Vous n\'avez pas accès à cette tâche');
         }
 
         return $this->success(
@@ -110,25 +106,13 @@ class TaskController extends BaseController
     {
         $user = $request->user();
 
-       
-        if (!$user->hasRole('admin')) {
-            if ($task->assigned_to !== $user->id) {
-                return $this->unauthorized('Vous ne pouvez modifier que vos propres tâches');
-            }
-
+        if ($user->hasRole('admin')) {
             $validated = $request->validate([
-                'status' => 'required|in:todo,in_progress,done'
-            ]);
-
-            $task->update(['status' => $validated['status']]);
-
-        } else {
-            $validated = $request->validate([
-                'title' => 'string|max:255',
+                'title' => 'sometimes|string|max:255',
                 'description' => 'nullable|string',
-                'status' => 'in:todo,in_progress,done',
-                'priority' => 'in:low,medium,high',
-                'assigned_to' => 'exists:users,id',
+                'status' => 'sometimes|in:todo,in_progress,done',
+                'priority' => 'sometimes|in:low,medium,high',
+                'assigned_to' => 'sometimes|exists:users,id',
                 'due_date' => 'nullable|date'
             ]);
 
@@ -140,6 +124,17 @@ class TaskController extends BaseController
             }
 
             $task->update($validated);
+
+        } else {
+            if ($task->assigned_to !== $user->id) {
+                return $this->forbidden('Vous ne pouvez modifier que vos propres tâches');
+            }
+
+            $validated = $request->validate([
+                'status' => 'required|in:todo,in_progress,done'
+            ]);
+
+            $task->update(['status' => $validated['status']]);
         }
 
         return $this->success(
@@ -154,7 +149,7 @@ class TaskController extends BaseController
     public function destroy(Request $request, Task $task)
     {
         if (!$request->user()->hasRole('admin')) {
-            return $this->unauthorized('Seuls les administrateurs peuvent supprimer des tâches');
+            return $this->forbidden('Seuls les administrateurs peuvent supprimer des tâches');
         }
 
         $task->delete();

@@ -16,12 +16,10 @@ class ProjectController extends BaseController
         $user = $request->user();
 
         if ($user->hasRole('admin')) {
-           
             $projects = Project::with(['tasks' => function($query) {
                 $query->with('assignedUser:id,name,email');
             }])->get();
         } else {
-           
             $projects = Project::whereHas('tasks', function($query) use ($user) {
                 $query->where('assigned_to', $user->id);
             })->with(['tasks' => function($query) use ($user) {
@@ -34,12 +32,12 @@ class ProjectController extends BaseController
     }
 
     /**
-     * Créer un projet 
+     * Créer un projet (admin uniquement)
      */
     public function store(Request $request)
     {
         if (!$request->user()->hasRole('admin')) {
-            return $this->unauthorized('Seuls les administrateurs peuvent créer des projets');
+            return $this->forbidden('Seuls les administrateurs peuvent créer des projets');
         }
 
         $validated = $request->validate([
@@ -62,22 +60,25 @@ class ProjectController extends BaseController
     {
         $user = $request->user();
 
-        if (!$user->hasRole('admin')) {
+        if ($user->hasRole('admin')) {
+            $project->load(['tasks' => function($query) {
+                $query->with('assignedUser:id,name,email');
+            }]);
+        } else {
            
-            $hasTask = $project->tasks()->where('assigned_to', $user->id)->exists();
+            $userTasksCount = \DB::table('tasks')
+                ->where('project_id', $project->id)
+                ->where('assigned_to', $user->id)
+                ->where('tenant_id', $user->tenant_id)
+                ->count();
             
-            if (!$hasTask) {
-                return $this->unauthorized('Vous n\'avez pas accès à ce projet');
+            if ($userTasksCount === 0) {
+                return $this->forbidden('Vous n\'avez pas accès à ce projet car aucune tâche ne vous y est assignée');
             }
 
-           
             $project->load(['tasks' => function($query) use ($user) {
                 $query->where('assigned_to', $user->id)
                       ->with('assignedUser:id,name,email');
-            }]);
-        } else {
-            $project->load(['tasks' => function($query) {
-                $query->with('assignedUser:id,name,email');
             }]);
         }
 
@@ -85,12 +86,12 @@ class ProjectController extends BaseController
     }
 
     /**
-     * Mettre à jour un projet 
+     * Mettre à jour un projet (admin uniquement)
      */
     public function update(Request $request, Project $project)
     {
         if (!$request->user()->hasRole('admin')) {
-            return $this->unauthorized('Seuls les administrateurs peuvent modifier des projets');
+            return $this->forbidden('Seuls les administrateurs peuvent modifier des projets');
         }
 
         $validated = $request->validate([
@@ -105,12 +106,12 @@ class ProjectController extends BaseController
     }
 
     /**
-     * Supprimer un projet 
+     * Supprimer un projet (admin uniquement)
      */
     public function destroy(Request $request, Project $project)
     {
         if (!$request->user()->hasRole('admin')) {
-            return $this->unauthorized('Seuls les administrateurs peuvent supprimer des projets');
+            return $this->forbidden('Seuls les administrateurs peuvent supprimer des projets');
         }
 
         $project->delete();

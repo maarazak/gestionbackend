@@ -11,7 +11,7 @@ API REST complète pour la gestion de projets et tâches avec architecture multi
 
 ### Gestion des Entités
 - **Tenants** : Organisations avec paramètres personnalisables
-- **Users** : Utilisateurs avec rôles (admin/member) par tenant
+- **Users** : Utilisateurs avec rôles (admin/user) par tenant
 - **Projects** : Projets avec statuts (active/completed/archived)
 - **Tasks** : Tâches avec priorités, assignations et échéances
 
@@ -54,7 +54,6 @@ Tenant (Organisation)
 - `id` (UUID, Primary Key)
 - `tenant_id` (Foreign Key vers tenants)
 - `name`, `email`, `password`
-- `role` (admin/member)
 - Contrainte unique : `[tenant_id, email]`
 
 #### Table `projects`

@@ -63,11 +63,19 @@ class BaseController extends Controller
     }
 
     /**
-     * Retourne une réponse d'erreur non autorisée
+     * Retourne une réponse d'erreur non autorisée (problème d'authentification)
      */
     protected function unauthorized(string $message = 'Non autorisé'): JsonResponse
     {
         return $this->error($message, 401);
+    }
+
+    /**
+     * Retourne une réponse d'erreur interdit (problème de permissions)
+     */
+    protected function forbidden(string $message = 'Accès interdit'): JsonResponse
+    {
+        return $this->error($message, 403);
     }
 
     /**
