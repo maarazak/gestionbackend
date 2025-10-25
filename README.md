@@ -97,7 +97,7 @@ cp .env.example .env
 php artisan key:generate
 
 # Base de données
-php artisan migrate
+php artisan migrate --seed
 
 # Démarrer le serveur
 php artisan serve
