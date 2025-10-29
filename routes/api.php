@@ -8,31 +8,27 @@ use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\UserController;
 
-// Auth routes (publiques)
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-// Routes protégées
-Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
-    // Auth
+Route::middleware(['auth:sanctum', 'set.tenant', 'tenant'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/switch-tenant', [AuthController::class, 'switchTenant']);
     
-    // Users 
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users/invite', [UserController::class, 'invite']);
     Route::delete('/users/{user}', [UserController::class, 'destroy']);
     
-    // Projects
     Route::apiResource('projects', ProjectController::class);
     
-    // Tasks
     Route::apiResource('tasks', TaskController::class);
-});
-
-// Routes admin pour gestion des tenants
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::apiResource('tenants', TenantController::class);
+    
+    Route::get('/tenants', [TenantController::class, 'index']);
+    Route::post('/tenants', [TenantController::class, 'store']);
+    Route::get('/tenants/{tenant}', [TenantController::class, 'show']);
+    Route::put('/tenants/{tenant}', [TenantController::class, 'update']);
+    Route::delete('/tenants/{tenant}', [TenantController::class, 'destroy']);
     Route::post('/tenants/{tenant}/users', [TenantController::class, 'addUser']);
     Route::get('/tenants/{tenant}/users', [TenantController::class, 'users']);
     Route::get('/tenants/{tenant}/projects', [TenantController::class, 'projects']);

@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\BaseController;
-use App\Models\Tenant;
 use App\Models\User;
+use App\Models\Tenant;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
+use App\Http\Controllers\BaseController;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends BaseController
 {
@@ -29,7 +30,6 @@ class AuthController extends BaseController
                 'password.min' => 'Le mot de passe doit contenir au moins 8 caractères',
             ]);
 
-            
             $existingUser = User::whereHas('tenant', function($query) use ($validated) {
                 $query->where('slug', $validated['tenant_slug']);
             })->where('email', $validated['email'])->first();
@@ -42,30 +42,32 @@ class AuthController extends BaseController
 
             DB::beginTransaction();
 
-         
             $tenant = Tenant::create([
                 'name' => $validated['tenant_name'],
                 'slug' => $validated['tenant_slug']
             ]);
 
-         
             $user = User::create([
                 'tenant_id' => $tenant->id,
+                'current_tenant_id' => $tenant->id,
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
             ]);
 
-          
+            $adminRole = Role::where('name', 'admin')->first();
             $user->assignRole('admin');
+            $user->tenants()->attach($tenant->id, ['role_id' => $adminRole->id]);
 
-          
             $token = $user->createToken('auth_token')->plainTextToken;
 
             DB::commit();
-            $user->role =  $user->getRoleAttribute();
+
+            $user->role = $user->getRoleAttribute();
+            $userData = $user->load(['tenant', 'currentTenant', 'tenants']);
+
             return $this->created([
-                'user' => $user->load('tenant'),
+                'user' => $userData,
                 'token' => $token
             ], 'Compte créé avec succès');
 
@@ -90,7 +92,7 @@ class AuthController extends BaseController
             ]);
 
             $tenant = Tenant::where('slug', $validated['tenant_slug'])->first();
-            
+
             if (!$tenant) {
                 throw ValidationException::withMessages([
                     'tenant_slug' => ['Organisation non trouvée.']
@@ -107,10 +109,20 @@ class AuthController extends BaseController
                 ]);
             }
 
+            if (!$user->tenants()->where('tenants.id', $tenant->id)->exists()) {
+                $userRole = $user->roles->first();
+                $roleId = $userRole ? $userRole->id : Role::where('name', 'user')->first()->id;
+                $user->tenants()->attach($tenant->id, ['role_id' => $roleId]);
+            }
+
+            $user->update(['current_tenant_id' => $tenant->id]);
+
             $token = $user->createToken('auth_token')->plainTextToken;
-            $user->role =  $user->getRoleAttribute();
+            $user->role = $user->getRoleAttribute();
+            $userData = $user->load(['tenant', 'currentTenant', 'tenants']);
+
             return $this->success([
-                'user' => $user->load('tenant'),
+                'user' => $userData,
                 'token' => $token
             ], 'Connexion réussie');
 
@@ -124,13 +136,49 @@ class AuthController extends BaseController
 
     public function me(Request $request)
     {
-        $request->user()->role =  $request->user()->getRoleAttribute();
-        return $this->success($request->user()->load('tenant'), 'Utilisateur récupéré');
+        $user = $request->user();
+        $user->role = $user->getRoleAttribute();
+        return $this->success($user->load(['tenant', 'currentTenant', 'tenants']), 'Utilisateur récupéré');
     }
 
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
         return $this->success(null, 'Déconnecté');
+    }
+
+    public function switchTenant(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'tenant_id' => 'required|uuid|exists:tenants,id'
+            ]);
+
+            $user = $request->user();
+
+            $tenant = $user->tenants()->where('tenants.id', $validated['tenant_id'])->first();
+
+            if (!$tenant) {
+                return $this->error('Vous n\'avez pas accès à cette organisation', 403);
+            }
+
+            $user->update(['current_tenant_id' => $validated['tenant_id']]);
+
+            $roleId = $tenant->pivot->role_id;
+            $role = Role::find($roleId);
+
+            $user->syncRoles([$role->name]);
+
+            $user->role = $user->getRoleAttribute();
+            $userData = $user->load(['tenant', 'currentTenant', 'tenants']);
+
+            return $this->success($userData, 'Organisation changée avec succès');
+
+        } catch (ValidationException $e) {
+            return $this->validationError($e->errors());
+        } catch (\Exception $e) {
+            Log::error('Erreur lors du changement d\'organisation: ' . $e->getMessage());
+            return $this->error('Une erreur est survenue lors du changement d\'organisation', 500);
+        }
     }
 }

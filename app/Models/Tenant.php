@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Tenant extends Model
 {
@@ -13,7 +14,6 @@ class Tenant extends Model
     protected $fillable = [
         'name',
         'slug',
-        'domain',
         'settings'
     ];
 
@@ -21,10 +21,16 @@ class Tenant extends Model
         'settings' => 'array'
     ];
 
-    
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'tenant_user')
+            ->withPivot('role_id')
+            ->withTimestamps();
     }
 
     public function projects(): HasMany

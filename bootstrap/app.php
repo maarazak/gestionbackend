@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'tenant' => \App\Http\Middleware\TenantScope::class,
+            'set.tenant' => \App\Http\Middleware\SetCurrentTenant::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -17,16 +17,16 @@ class TenantScope
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // Injecter le tenant_id dans toutes les requêtes
-        $request->merge(['tenant_id' => $user->tenant_id]);
+        $currentTenantId = $user->current_tenant_id ?? $user->tenant_id;
         
-        // Scope global pour toutes les queries
-        Project::addGlobalScope('tenant', function ($query) use ($user) {
-            $query->where('tenant_id', $user->tenant_id);
+        $request->merge(['tenant_id' => $currentTenantId]);
+        
+        Project::addGlobalScope('tenant', function ($query) use ($currentTenantId) {
+            $query->where('tenant_id', $currentTenantId);
         });
-        // Scope global pour toutes les queries
-        Task::addGlobalScope('tenant', function ($query) use ($user) {
-            $query->where('tenant_id', $user->tenant_id);
+
+        Task::addGlobalScope('tenant', function ($query) use ($currentTenantId) {
+            $query->where('tenant_id', $currentTenantId);
         });
 
         return $next($request);
