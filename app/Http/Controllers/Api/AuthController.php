@@ -21,24 +21,15 @@ class AuthController extends BaseController
                 'tenant_name' => 'required|string|max:255',
                 'tenant_slug' => 'required|string|max:255|unique:tenants,slug|regex:/^[a-z0-9-]+$/',
                 'name' => 'required|string|max:255',
-                'email' => 'required|email|max:255',
+                'email' => 'required|email|max:255|unique:users,email',
                 'password' => 'required|string|min:8|confirmed',
             ], [
                 'tenant_slug.regex' => 'Le slug ne peut contenir que des lettres minuscules, chiffres et tirets',
                 'tenant_slug.unique' => 'Ce slug est déjà utilisé',
+                'email.unique' => 'Cet email est déjà utilisé',
                 'password.confirmed' => 'Les mots de passe ne correspondent pas',
                 'password.min' => 'Le mot de passe doit contenir au moins 8 caractères',
             ]);
-
-            $existingUser = User::whereHas('tenant', function($query) use ($validated) {
-                $query->where('slug', $validated['tenant_slug']);
-            })->where('email', $validated['email'])->first();
-
-            if ($existingUser) {
-                return $this->validationError([
-                    'email' => ['Cet email est déjà utilisé dans cette organisation']
-                ]);
-            }
 
             DB::beginTransaction();
 
@@ -48,7 +39,6 @@ class AuthController extends BaseController
             ]);
 
             $user = User::create([
-                'tenant_id' => $tenant->id,
                 'current_tenant_id' => $tenant->id,
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -57,6 +47,7 @@ class AuthController extends BaseController
 
             $adminRole = Role::where('name', 'admin')->first();
             $user->assignRole('admin');
+            
             $user->tenants()->attach($tenant->id, ['role_id' => $adminRole->id]);
 
             $token = $user->createToken('auth_token')->plainTextToken;
@@ -64,7 +55,7 @@ class AuthController extends BaseController
             DB::commit();
 
             $user->role = $user->getRoleAttribute();
-            $userData = $user->load(['tenant', 'currentTenant', 'tenants']);
+            $userData = $user->load(['currentTenant', 'tenants']);
 
             return $this->created([
                 'user' => $userData,
@@ -99,9 +90,7 @@ class AuthController extends BaseController
                 ]);
             }
 
-            $user = User::where('tenant_id', $tenant->id)
-                ->where('email', $validated['email'])
-                ->first();
+            $user = User::where('email', $validated['email'])->first();
 
             if (!$user || !Hash::check($validated['password'], $user->password)) {
                 throw ValidationException::withMessages([
@@ -109,17 +98,25 @@ class AuthController extends BaseController
                 ]);
             }
 
-            if (!$user->tenants()->where('tenants.id', $tenant->id)->exists()) {
-                $userRole = $user->roles->first();
-                $roleId = $userRole ? $userRole->id : Role::where('name', 'user')->first()->id;
-                $user->tenants()->attach($tenant->id, ['role_id' => $roleId]);
+            if (!$user->hasAccessToTenant($tenant->id)) {
+                throw ValidationException::withMessages([
+                    'tenant_slug' => ['Vous n\'avez pas accès à cette organisation.']
+                ]);
             }
 
             $user->update(['current_tenant_id' => $tenant->id]);
 
+            $tenantUser = $user->tenants()->where('tenants.id', $tenant->id)->first();
+            if ($tenantUser && $tenantUser->pivot && $tenantUser->pivot->role_id) {
+                $role = Role::find($tenantUser->pivot->role_id);
+                if ($role) {
+                    $user->syncRoles([$role->name]);
+                }
+            }
+
             $token = $user->createToken('auth_token')->plainTextToken;
             $user->role = $user->getRoleAttribute();
-            $userData = $user->load(['tenant', 'currentTenant', 'tenants']);
+            $userData = $user->load(['currentTenant', 'tenants']);
 
             return $this->success([
                 'user' => $userData,
@@ -138,7 +135,7 @@ class AuthController extends BaseController
     {
         $user = $request->user();
         $user->role = $user->getRoleAttribute();
-        return $this->success($user->load(['tenant', 'currentTenant', 'tenants']), 'Utilisateur récupéré');
+        return $this->success($user->load(['currentTenant', 'tenants']), 'Utilisateur récupéré');
     }
 
     public function logout(Request $request)
@@ -156,21 +153,17 @@ class AuthController extends BaseController
 
             $user = $request->user();
 
-            $tenant = $user->tenants()->where('tenants.id', $validated['tenant_id'])->first();
-
-            if (!$tenant) {
+            if (!$user->hasAccessToTenant($validated['tenant_id'])) {
                 return $this->error('Vous n\'avez pas accès à cette organisation', 403);
             }
 
-            $user->update(['current_tenant_id' => $validated['tenant_id']]);
+            if (!$user->switchTenant($validated['tenant_id'])) {
+                return $this->error('Impossible de changer d\'organisation', 500);
+            }
 
-            $roleId = $tenant->pivot->role_id;
-            $role = Role::find($roleId);
-
-            $user->syncRoles([$role->name]);
-
+            $user->refresh();
             $user->role = $user->getRoleAttribute();
-            $userData = $user->load(['tenant', 'currentTenant', 'tenants']);
+            $userData = $user->load(['currentTenant', 'tenants']);
 
             return $this->success($userData, 'Organisation changée avec succès');
 
@@ -178,6 +171,7 @@ class AuthController extends BaseController
             return $this->validationError($e->errors());
         } catch (\Exception $e) {
             Log::error('Erreur lors du changement d\'organisation: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
             return $this->error('Une erreur est survenue lors du changement d\'organisation', 500);
         }
     }

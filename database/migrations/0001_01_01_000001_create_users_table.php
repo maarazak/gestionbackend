@@ -14,13 +14,14 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid');
-            $table->foreignUuid('tenant_id')->constrained()->onDelete('cascade');
             $table->string('name');
-            $table->string('email');
+            $table->string('email')->unique();
             $table->string('password');
+            $table->foreignUuid('current_tenant_id')
+                ->nullable()
+                ->constrained('tenants')
+                ->onDelete('set null');
             $table->timestamps();
-            
-            $table->unique(['tenant_id', 'email']);
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

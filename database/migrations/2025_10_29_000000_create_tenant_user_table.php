@@ -18,18 +18,13 @@ return new class extends Migration
             $table->unique(['tenant_id', 'user_id']);
         });
 
-        Schema::table('users', function (Blueprint $table) {
-            $table->foreignUuid('current_tenant_id')->nullable()->after('tenant_id')->constrained('tenants')->onDelete('set null');
-        });
+
     }
 
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropForeign(['current_tenant_id']);
-            $table->dropColumn('current_tenant_id');
-        });
-        
+       
+
         Schema::dropIfExists('tenant_user');
     }
 };

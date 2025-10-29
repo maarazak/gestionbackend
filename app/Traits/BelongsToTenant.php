@@ -2,8 +2,9 @@
 
 namespace App\Traits;
 
-use App\Models\Tenant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Tenant;
 
 trait BelongsToTenant
 {
@@ -11,7 +12,16 @@ trait BelongsToTenant
     {
         static::creating(function ($model) {
             if (!$model->tenant_id && auth()->check()) {
-                $model->tenant_id = auth()->user()->tenant_id;
+                $user = auth()->user();
+                if ($user->current_tenant_id) {
+                    $model->tenant_id = $user->current_tenant_id;
+                }
+            }
+        });
+
+        static::addGlobalScope('tenant', function (Builder $builder) {
+            if (auth()->check() && auth()->user()->current_tenant_id) {
+                $builder->where('tenant_id', auth()->user()->current_tenant_id);
             }
         });
     }

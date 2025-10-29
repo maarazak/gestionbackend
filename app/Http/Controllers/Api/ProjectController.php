@@ -8,9 +8,6 @@ use Illuminate\Http\Request;
 
 class ProjectController extends BaseController
 {
-    /**
-     * Liste des projets
-     */
     public function index(Request $request)
     {
         $user = $request->user();
@@ -31,9 +28,6 @@ class ProjectController extends BaseController
         return $this->success($projects, 'Projets récupérés');
     }
 
-    /**
-     * Créer un projet (admin uniquement)
-     */
     public function store(Request $request)
     {
         if (!$request->user()->hasRole('admin')) {
@@ -53,9 +47,6 @@ class ProjectController extends BaseController
         return $this->created($project->load('tasks'), 'Projet créé avec succès');
     }
 
-    /**
-     * Afficher un projet
-     */
     public function show(Request $request, Project $project)
     {
         $user = $request->user();
@@ -75,9 +66,6 @@ class ProjectController extends BaseController
         return $this->success($project, 'Projet récupéré');
     }
 
-    /**
-     * Mettre à jour un projet (admin uniquement)
-     */
     public function update(Request $request, Project $project)
     {
         if (!$request->user()->hasRole('admin')) {
@@ -95,9 +83,6 @@ class ProjectController extends BaseController
         return $this->success($project, 'Projet mis à jour');
     }
 
-    /**
-     * Supprimer un projet (admin uniquement)
-     */
     public function destroy(Request $request, Project $project)
     {
         if (!$request->user()->hasRole('admin')) {

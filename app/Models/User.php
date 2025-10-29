@@ -4,19 +4,19 @@ namespace App\Models;
 
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasApiTokens, HasRoles;
 
     protected $fillable = [
-        'tenant_id',
         'current_tenant_id',
         'name',
         'email',
@@ -44,7 +44,7 @@ class User extends Authenticatable
             $user->uuid = Str::uuid();
         });
     }
-    
+
     public function getRouteKeyName()
     {
         return 'uuid';
@@ -52,12 +52,18 @@ class User extends Authenticatable
 
     public function getRoleAttribute()
     {
-        return $this->roles->first()?->name;
-    }
-    
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(Tenant::class);
+        if (!$this->current_tenant_id) {
+            return null;
+        }
+
+        $tenant = $this->tenants()->where('tenants.id', $this->current_tenant_id)->first();
+
+        if (!$tenant || !$tenant->pivot || !$tenant->pivot->role_id) {
+            return null;
+        }
+
+        $role = Role::find($tenant->pivot->role_id);
+        return $role?->name;
     }
 
     public function currentTenant(): BelongsTo
@@ -71,21 +77,33 @@ class User extends Authenticatable
             ->withPivot('role_id')
             ->withTimestamps();
     }
-    
+
     public function assignedTasks()
     {
         return $this->hasMany(Task::class, 'assigned_to');
     }
 
-    public function switchTenant($tenantId)
+    public function hasAccessToTenant($tenantId): bool
     {
-        $tenant = $this->tenants()->where('tenants.id', $tenantId)->first();
-        
-        if (!$tenant) {
+        return $this->tenants()->where('tenants.id', $tenantId)->exists();
+    }
+
+    public function switchTenant($tenantId): bool
+    {
+        if (!$this->hasAccessToTenant($tenantId)) {
             return false;
         }
 
         $this->update(['current_tenant_id' => $tenantId]);
+
+        $tenant = $this->tenants()->where('tenants.id', $tenantId)->first();
+        if ($tenant && $tenant->pivot && $tenant->pivot->role_id) {
+            $role = Role::find($tenant->pivot->role_id);
+            if ($role) {
+                $this->syncRoles([$role->name]);
+            }
+        }
+
         return true;
     }
 

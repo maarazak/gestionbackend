@@ -11,9 +11,6 @@ use Illuminate\Support\Facades\DB;
 
 class TaskController extends BaseController
 {
-    /**
-     * Liste des tâches
-     */
     public function index(Request $request)
     {
         $user = $request->user();
@@ -32,9 +29,6 @@ class TaskController extends BaseController
         return $this->success($tasks, 'Tâches récupérées');
     }
 
-    /**
-     * Créer une tâche (admin uniquement)
-     */
     public function store(Request $request)
     {
         if (!$request->user()->hasRole('admin')) {
@@ -52,13 +46,12 @@ class TaskController extends BaseController
                 'due_date' => 'nullable|date'
             ]);
 
+            $user = $request->user();
+
             $project = Project::findOrFail($validated['project_id']);
-            if ($project->tenant_id !== $request->user()->tenant_id) {
-                return $this->forbidden('Ce projet n\'existe pas dans votre organisation');
-            }
 
             $assignedUser = User::findOrFail($validated['assigned_to']);
-            if ($assignedUser->tenant_id !== $request->user()->tenant_id) {
+            if (!$assignedUser->hasAccessToTenant($user->current_tenant_id)) {
                 return $this->error('Cet utilisateur n\'appartient pas à votre organisation', 400);
             }
 
@@ -82,9 +75,6 @@ class TaskController extends BaseController
         }
     }
 
-    /**
-     * Afficher une tâche
-     */
     public function show(Request $request, Task $task)
     {
         $user = $request->user();
@@ -99,9 +89,6 @@ class TaskController extends BaseController
         );
     }
 
-    /**
-     * Mettre à jour une tâche
-     */
     public function update(Request $request, Task $task)
     {
         $user = $request->user();
@@ -118,7 +105,7 @@ class TaskController extends BaseController
 
             if (isset($validated['assigned_to'])) {
                 $assignedUser = User::findOrFail($validated['assigned_to']);
-                if ($assignedUser->tenant_id !== $user->tenant_id) {
+                if (!$assignedUser->hasAccessToTenant($user->current_tenant_id)) {
                     return $this->error('Cet utilisateur n\'appartient pas à votre organisation', 400);
                 }
             }
@@ -143,9 +130,6 @@ class TaskController extends BaseController
         );
     }
 
-    /**
-     * Supprimer une tâche (admin uniquement)
-     */
     public function destroy(Request $request, Task $task)
     {
         if (!$request->user()->hasRole('admin')) {

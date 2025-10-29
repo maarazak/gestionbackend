@@ -12,9 +12,12 @@ class SetCurrentTenant
     {
         $user = $request->user();
 
-        if ($user && !$user->current_tenant_id) {
-            $user->update(['current_tenant_id' => $user->tenant_id]);
-        }
+        // if ($user && !$user->current_tenant_id) {
+        //     $firstTenant = $user->tenants()->first();
+        //     if ($firstTenant) {
+        //         $user->update(['current_tenant_id' => $firstTenant->id]);
+        //     }
+        // }
 
         if ($user && $user->current_tenant_id) {
             config(['app.current_tenant_id' => $user->current_tenant_id]);
